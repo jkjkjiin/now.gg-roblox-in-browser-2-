@@ -8,7 +8,7 @@
         (navigator.languages && navigator.languages[0]) || navigator.language;
       if (language == null || language === "") {
         language = "en";
-      } else if (language.indexOf("-" !== -1)) {
+      } else if (language.indexOf("-") !== -1) {
         language = language.split("-")[0];
       }
       window.language = language;
@@ -169,7 +169,7 @@
         const recaptchaToken = "dGhpc2lzYWZha2V0b2tlbg"
  
         const host = "" || "";
-        let url = `https://cors-bypass-app.herokuapp.com/post?url=https://now.gg/api/user/v2/auth?locale=${window.language}`;
+        let targetUrl = `https://now.gg/api/user/v2/auth?locale=${window.language}`;
         const sessionId = sessionStorage.getItem("sessionId");
         let userUuid;
         const userSessionId = searchParams.get(
@@ -192,18 +192,22 @@
           recaptchaToken,
           adTrackingId: window.adTrackingId
         };
-        url += window.utmParamsStr;
+        targetUrl += window.utmParamsStr;
         if(window.isIpad) {
           data.forceDeviceType = "ipad";
         }
  
         window.sessionId = userUuid;
-        window[`${window.gameId}-auth`] = fetch(url, {
-          method: "Post",
+        window[`${window.gameId}-auth`] = fetch('/api/proxy', {
+          method: "POST",
           headers: {
             "Content-Type": "application/json"
           },
-          body: JSON.stringify(data),
+          body: JSON.stringify({
+            url: targetUrl,
+            method: "POST",
+            body: data
+          }),
         });
       }
       // Check that service workers are supported
