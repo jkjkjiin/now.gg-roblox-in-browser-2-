@@ -43,7 +43,7 @@ app.post('/api/proxy', async (req, res) => {
       return res.status(400).json({ error: 'URL is required' });
     }
 
-    const allowedDomains = ['now.gg', 'api.now.gg'];
+    const allowedDomains = ['now.gg', 'api.now.gg', 'account.api.now.gg'];
     const urlObj = new URL(url);
     if (!allowedDomains.some(domain => urlObj.hostname.includes(domain))) {
       console.log('Error: Domain not allowed:', urlObj.hostname);
@@ -55,35 +55,70 @@ app.post('/api/proxy', async (req, res) => {
     const proxyHeaders = {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
       ...headers
     };
 
+    // Remove headers that should not be forwarded
     delete proxyHeaders['host'];
     delete proxyHeaders['origin'];
+    delete proxyHeaders['referer'];
 
-    const response = await fetch(url, {
+    const fetchOptions = {
       method: method,
       headers: proxyHeaders,
-      body: body ? JSON.stringify(body) : undefined
-    });
+      timeout: 10000 // 10 second timeout
+    };
+
+    if (body && method !== 'GET') {
+      fetchOptions.body = JSON.stringify(body);
+    }
+
+    const response = await fetch(url, fetchOptions);
 
     const data = await response.text();
     console.log('Response status:', response.status);
-    console.log('Response data (first 200 chars):', data.substring(0, 200));
+    console.log('Response headers:', JSON.stringify([...response.headers.entries()]));
+    console.log('Response data (first 500 chars):', data.substring(0, 500));
+    
     let jsonData;
     try {
       jsonData = JSON.parse(data);
     } catch (e) {
-      jsonData = { rawResponse: data };
+      console.log('Failed to parse JSON response:', e.message);
+      jsonData = { 
+        rawResponse: data,
+        parseError: 'Response is not valid JSON'
+      };
     }
 
+    // Forward response headers
+    const responseHeaders = {};
+    response.headers.forEach((value, key) => {
+      if (!['content-encoding', 'transfer-encoding', 'connection'].includes(key.toLowerCase())) {
+        responseHeaders[key] = value;
+      }
+    });
+
+    res.set(responseHeaders);
     res.status(response.status).json(jsonData);
   } catch (error) {
     console.error('Proxy error:', error);
-    res.status(500).json({ 
+    
+    // More detailed error information
+    const errorResponse = {
       error: 'Proxy request failed',
-      message: error.message 
-    });
+      message: error.message,
+      code: error.code || 'UNKNOWN',
+      type: error.type || 'unknown'
+    };
+
+    // If DNS resolution failed, provide guidance
+    if (error.code === 'ENOTFOUND') {
+      errorResponse.suggestion = 'The API endpoint could not be found. This may indicate the API is not publicly accessible or requires authentication/IP whitelisting.';
+    }
+
+    res.status(500).json(errorResponse);
   }
 });
 
