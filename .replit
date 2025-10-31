@@ -1,7 +1,8 @@
 hidden=[".config"]
+modules = ["web", "nodejs-20", "nix", "python-3.11"]
 
 [nix]
-channel = "stable-21_11"
+channel = "stable-25_05"
 
 [languages.html]
 pattern = "**/*.html"
@@ -50,3 +51,31 @@ pattern = "**/*.html"
 pattern = "**/{*.js,*.jsx,*.ts,*.tsx,*.mjs,*.cjs}"
   [languages.javascript.languageServer]
   start = ["typescript-language-server", "--stdio"]
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "web-server"
+
+[[workflows.workflow]]
+name = "web-server"
+author = "agent"
+
+[workflows.workflow.metadata]
+outputType = "webview"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node server.js"
+waitForPort = 5000
+
+[[ports]]
+localPort = 5000
+externalPort = 80
